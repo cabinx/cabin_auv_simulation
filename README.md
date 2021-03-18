@@ -1,3 +1,4 @@
+# cabin_auv_simulation
 Simulation environment, with gazebo&ros, for the project [cabin_auv_ws](https://github.com/cabinx/cabin_auv_ws), a simple demo for rov/auv underwater object tracking based on ros.
 ![image](https://github.com/cabinx/cabin_auv_simulation/blob/main/media/test_image.png)
 A test video can be found in the media folder.
