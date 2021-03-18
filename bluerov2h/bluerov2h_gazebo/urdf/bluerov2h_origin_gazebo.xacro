@@ -1,0 +1,227 @@
+<?xml version="1.0"?>
+<!-- 
+     All rights reserved.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<robot name="bluerov2h" xmlns:xacro="http://www.ros.org/wiki/xacro" >
+  <xacro:arg name="debug" default="0"/>
+  <xacro:arg name="namespace" default="bluerov2h_origin"/>
+  <xacro:arg name="inertial_reference_frame" default="world"/>
+
+  <xacro:include filename="$(find uuv_sensor_ros_plugins)/urdf/sensor_snippets.xacro"/>
+  <xacro:include filename="$(find bluerov2h_gazebo)/urdf/sensors/bluerov2h_imu_snippets.xacro"/>
+  <xacro:include filename="$(find bluerov2h_gazebo)/urdf/sensors/bluerov2h_camera_snippets.xacro"/>
+  
+  <!-- Includes -->
+  <!--xacro:include filename="$(find bluerov2h)/urdf/sensor_snippets.xacro"/>-->
+  <!---->
+  
+  <!-- base_link according to ROS conventions: x forward, z up -->
+  <link name="$(arg namespace)/base_link">
+    <inertial>
+      <mass value="11.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.099" ixy="0" ixz="0.0056" iyy="0.129" iyz="0" izz="0.16"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov2h_description/meshes/bluerov2h_no_props.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov2h_description/meshes/bluerov2h_no_props.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <gazebo>
+    <plugin name="uuv_plugin" filename="libuuv_underwater_object_ros_plugin.so">
+      <!-- Hydro parameters for the vehicle -->
+      <fluid_density>1028.0</fluid_density>
+      <flow_velocity_topic>hydrodynamics/current_velocity</flow_velocity_topic>
+      <debug>$(arg debug)</debug>
+      
+      <link name="$(arg namespace)/base_link">
+        <neutrally_buoyant>1</neutrally_buoyant>
+        <!--Volume, see p.31 in Berg2012-->
+        <volume>0.01138</volume>
+        <box>
+          <width>0.575</width>
+          <length>0.457</length>
+          <height>0.254</height>
+        </box>
+        <!--
+        Center of buoyancy according to eq. (3.1) p. 28 in Berg2012.
+        The original values, [0.0822, -0.00773, 0.3872] however, seem to
+        assume NWU (otherwise cob is below cog?)
+        -->
+        <center_of_buoyancy>0.0 0.0 0.02</center_of_buoyancy>
+        <hydrodynamic_model>
+          <type>fossen</type>
+          <!-- Added mass: see p.28 in Berg2012 -->
+          <added_mass>
+            5.5 0 0 0 0 0
+            0 12.7 0 0 0 0
+            0 0 14.57 0 0 0
+            0 0 0 0.12 0 0
+            0 0 0 0 0.12 0
+            0 0 0 0 0 0.12
+          </added_mass>
+          <!--Linear damping: see p.31 in Berg2012-->
+          <!--<linear_damping>
+            -11.7391 -20 -31.8678 -25 -25.9085 -5
+          </linear_damping>-->
+          <!-- Non-linear damping: see p.30 in Berg2012 -->
+          <!--<quadratic_damping>
+            0 0 0 0 0 0
+          </quadratic_damping>-->
+          
+          <linear_damping>
+            -4.03 -6.22 -5.18 -0.07 -0.07 -0.07
+          </linear_damping>
+          <quadratic_damping>
+            -18.18 -21.66 -36.99 -1.55 -1.55 -1.55
+          </quadratic_damping>
+        </hydrodynamic_model>
+      </link>
+    </plugin>
+  </gazebo>
+  
+  
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/$(arg namespace)</robotNamespace>
+      <robotParam>/$(arg namespace)/robot_description</robotParam>
+    </plugin>
+  </gazebo>
+  
+  <!-- Define thrusters for propulsion -->
+  <xacro:property name="prop_mesh_file" value="file://$(find bluerov2h_description)/meshes/Propeller.dae"/>
+  <!-- Common values, colors, converstion, standard shapes/inertia etc.
+      Dependency for the thruster_snippets.xacro-->
+  <xacro:include filename="$(find uuv_descriptions)/urdf/common.urdf.xacro"/>
+  <!--Various thruster models-->
+  <xacro:include filename="$(find uuv_gazebo_ros_plugins)/urdf/thruster_snippets.xacro"/>
+  
+  <!-- Thruster joint and link snippet
+       Wrapper for the the thruster_module_first_order_basic_fcn_macro
+       defined in uuv_gazebo_ros_plugins/urdf/thruster_snippet.
+       Uses the "thruster_cf_basic_macro"
+        1) Basic curve
+	Input: x
+	Output: thrust
+	Function: thrust = rotorConstant * x * abs(x)
+  -->
+  <!--
+  <xacro:macro name="thruster_macro" params="thruster_id *origin">
+    <xacro:generic_thruster_macro
+      namespace="$(arg namespace)"
+      thruster_id="${thruster_id}"
+      mesh_filename="${prop_mesh_file}">
+      <xacro:insert_block name="origin"/>
+      <xacro:rotor_dyn_first_order_macro time_constant="0.00001"/>
+      <xacro:thruster_cf_basic_macro rotor_constant="0.0012"/>
+    </xacro:generic_thruster_macro>
+  </xacro:macro>
+  -->
+   <xacro:macro name="thruster_macro"
+	      params="thruster_id *origin">
+   <xacro:thruster_module_first_order_basic_fcn_macro
+       namespace="$(arg namespace)"
+       thruster_id="${thruster_id}"
+       mesh_filename="${prop_mesh_file}"
+       dyn_time_constant="0.00001"
+       rotor_constant="0.0012">
+     <xacro:insert_block name="origin"/>
+   </xacro:thruster_module_first_order_basic_fcn_macro>
+ </xacro:macro>
+  
+  <xacro:thruster_macro thruster_id="0">
+    <!--<origin xyz="0.155 -0.093 -0.066" rpy="0 0 ${45*d2r}"/>-->
+    <origin xyz="0.150552 -0.097497 -0.067" rpy="0 0 ${48*d2r}"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="1">
+    <!--<origin xyz="0.156 0.093 -0.066" rpy="0 0 ${-45*d2r}"/>-->
+    <origin xyz="0.150552 0.097497 -0.067" rpy="0 0 ${-48*d2r}"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="2">
+    <origin xyz="-0.134254 -0.101309 -0.067" rpy="0 0 ${132*d2r}"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="3">
+    <origin xyz="-0.134254 0.101309 -0.067" rpy="0 0 ${-132*d2r}"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="4">
+    <origin xyz="0.129493 0.219864 -0.012138" rpy="0 ${-90*d2r} 0"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="5">
+    <origin xyz="0.129493 -0.219864 -0.012138" rpy="0 ${-90*d2r} 0"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="6">
+    <origin xyz="-0.110931 0.219864 -0.012138" rpy="0 ${-90*d2r} 0"/>
+  </xacro:thruster_macro>
+
+  <xacro:thruster_macro thruster_id="7">
+    <origin xyz="-0.110931 -0.219864 -0.012138" rpy="0 ${-90*d2r} 0"/>
+  </xacro:thruster_macro>
+
+
+  <!--camera -->
+  <xacro:bluerov2h_camera_plugin_macro
+   namespace="$(arg namespace)"
+   parent_link="$(arg namespace)/base_link"
+   camera_topic="image_raw"
+   mass_camera_sensor="0.02" >
+   <origin xyz="0.20 0 0" rpy="0 0 0"/>
+  </xacro:bluerov2h_camera_plugin_macro>
+  
+  <!-- ADIS16448 IMU -->
+  <xacro:bluerov2h_imu_plugin_macro 
+    namespace="$(arg namespace)"
+    imu_suffix=""
+    parent_link="$(arg namespace)/base_link"
+    imu_topic="imu"
+    mass_imu_sensor="0.015"
+    gyroscope_noise_density="0.0003394"
+    gyroscope_random_walk="0.000038785"
+    gyroscope_bias_correlation_time="1000.0"
+    gyroscope_turn_on_bias_sigma="0.0087"
+    accelerometer_noise_density="0.004"
+    accelerometer_random_walk="0.006"
+    accelerometer_bias_correlation_time="300.0"
+    accelerometer_turn_on_bias_sigma="0.1960"
+    orientation_noise="0.01"
+    update_rate="50"
+    reference_frame="world"
+    enable_local_ned_frame="false">
+    <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001" />
+    <origin xyz="0.0 0 0" rpy="0 0 0"/>
+  </xacro:bluerov2h_imu_plugin_macro>
+  
+  <gazebo>
+    <plugin name="uuv_joint_state_publisher" filename="libuuv_joint_state_publisher.so">
+      <robotNamespace>$(arg namespace)</robotNamespace>
+      <updateRate>50</updateRate>
+    </plugin>
+  </gazebo>
+</robot>

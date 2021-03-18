@@ -1,0 +1,12 @@
+<launch>
+  <!--the thrust controller-->
+  <include file="$(find cabin_controllers)/launch/thruster_controller_gazebo_sim.launch">
+  </include>
+  <!--get the deviation between the center of the object and the center of the image-->
+  <include file="$(find cabin_vision)/launch/object_deviation.launch">
+  </include>
+  <!--tracking by pid-->
+  <include file="$(find cabin_behaviors)/launch/pid_tracking.launch">
+  </include>  
+
+</launch>

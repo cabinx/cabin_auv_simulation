@@ -1,0 +1,11 @@
+<launch>
+  <!--arg name="properties_file" value="$(find cabin_controllers)/cfg/vehicle_properties.yaml" /-->
+  <!--arg name="properties_file" value="$(find cabin_controllers)/cfg/cabinVehicleProperties.yaml" /-->
+  <arg name="properties_file" value="$(find cabin_controllers)/cfg/bluerov_heavy_properties.yaml" />
+  <arg name="robot_name" default="bluerov2h_origin" />
+
+  <node pkg="cabin_controllers" type="thruster_controller_gazebo_sim" name="thruster_controller_gazebo_sim" output="screen" >
+    <param name="properties_file" type="string" value="$(arg properties_file)" />
+    <param name="robot_name" type="string" value="$(arg robot_name)"/>
+  </node>
+</launch>
