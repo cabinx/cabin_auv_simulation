@@ -26,4 +26,4 @@ Test:
 4. rosrun rqt_reconfigure rqt_reconfigre
 5. tuning the parameter, turn on the tracking_switch in the rqt_reconfigre panel
 
-The robot can also be controlled by a joystick with the package cabin_telep.
+The robot can also be controlled by a joystick with the package cabin_teleop.
